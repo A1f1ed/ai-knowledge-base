@@ -4,6 +4,7 @@ from utils.manager_utils import get_available_categories, get_files_in_category,
 from core.document_chat_controller import process_uploaded_file
 from services.google_drive_service import sync_from_drive
 from config.config import KNOWLEDGE_BASE_PATH
+from streamlit import secrets
 
 # ============================
 # file upload and management area
@@ -73,14 +74,20 @@ def render_upload_section():
     st.write("📑 Files in Category")
     show_file_manager_dialog(selected_category)
 
+    DRIVE_FOLDER_ID = secrets.get("DRIVE_FOLDER_ID", None)
+
     # Google Drive sync button
     st.divider()
-    if st.button("🔄 Sync with Google Drive", use_container_width=True):
-        with st.spinner("Syncing with Google Drive..."):
-            if sync_from_drive():
-                st.success("Successfully synced with Google Drive!")
-            else:
-                st.error("Failed to sync with Google Drive.")
+
+    if DRIVE_FOLDER_ID is not None:
+        if st.button("🔄 Sync with Google Drive", use_container_width=True):
+            with st.spinner("Syncing with Google Drive..."):
+                if sync_from_drive():
+                    st.success("Successfully synced with Google Drive!")
+                else:
+                    st.error("Failed to sync with Google Drive.")
+    else:
+        st.warning("🔒 Google Drive Sync is disabled in cloud mode.")
 
 
 # ============================
@@ -90,7 +97,7 @@ def render_sidebar_controls():
     st.sidebar.title("🧠 AI Assistant Settings")
     selected_model = st.sidebar.selectbox(
         "Choose a model:",
-        ["mistral:7b-instruct", "llama2", "deepseek-coder"],
+        ["mistral:7b-instruct", "deepseek-coder"],
         key="model_selector",
     )
     use_web = st.sidebar.checkbox("🌐 Use Web Search", key="use_web_checkbox")

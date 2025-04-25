@@ -4,6 +4,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Streamlit secrets file (local only)
+.streamlit/secrets.toml
+
 # --- Test files & Jupyter Notebooks ---
 test_*.py
 test_*.ipynb
