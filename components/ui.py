@@ -80,8 +80,12 @@ def render_upload_section():
         label_visibility="collapsed"
     )
     
+    # Process uploaded files
     if uploaded_files:
-        process_uploaded_files(uploaded_files, selected_category)
+        if process_uploaded_files(uploaded_files, selected_category):
+            # Clear the file uploader
+            st.session_state.file_uploader = None
+            st.rerun()
     
     # Show files in current category
     st.sidebar.write("📑 Files in Category")
@@ -238,13 +242,17 @@ def process_uploaded_files(uploaded_files, selected_category):
     """Process uploaded files and save them to the selected category"""
     if not selected_category:
         st.error("Please select a category first")
-        return
+        return False
         
-    with st.spinner("Processing uploaded files..."):
-        for uploaded_file in uploaded_files:
-            process_uploaded_file(uploaded_file, selected_category)
-        st.success("Files uploaded successfully!")
-        st.rerun()  # refresh to show new files
+    try:
+        with st.spinner("Processing uploaded files..."):
+            for uploaded_file in uploaded_files:
+                process_uploaded_file(uploaded_file, selected_category)
+            st.success("Files uploaded successfully!")
+            return True
+    except Exception as e:
+        st.error(f"Error processing files: {str(e)}")
+        return False
 
 def render_category_management():
     """Render the category management section"""
