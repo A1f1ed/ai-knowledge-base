@@ -73,6 +73,10 @@ def render_upload_section():
     
     # Upload files section
     st.sidebar.write("📤 Upload Files")
+    
+    # Add file size limit warning
+    st.sidebar.caption("Limit 200MB per file")
+    
     uploaded_files = st.sidebar.file_uploader(
         "Choose files to upload",
         accept_multiple_files=True,
@@ -82,7 +86,8 @@ def render_upload_section():
     
     # Process uploaded files
     if uploaded_files:
-        if process_uploaded_files(uploaded_files, selected_category):
+        upload_success = process_uploaded_files(uploaded_files, selected_category)
+        if upload_success:
             # Clear the file uploader
             st.session_state.file_uploader = None
             st.rerun()
@@ -96,11 +101,14 @@ def render_upload_section():
     # Google Drive sync button
     if st.sidebar.button("🔄 Sync with Google Drive", use_container_width=True):
         with st.spinner("Syncing with Google Drive..."):
-            if sync_from_drive():
-                st.success("Successfully synced with Google Drive!")
-                st.rerun()
-            else:
-                st.error("Failed to sync with Google Drive.")
+            try:
+                if sync_from_drive():
+                    st.success("Successfully synced with Google Drive!")
+                    st.rerun()
+                else:
+                    st.error("Failed to sync with Google Drive.")
+            except Exception as e:
+                st.error(f"Error during sync: {str(e)}")
 
 
 # ============================
@@ -245,13 +253,14 @@ def process_uploaded_files(uploaded_files, selected_category):
         return False
         
     try:
-        with st.spinner("Processing uploaded files..."):
-            for uploaded_file in uploaded_files:
+        for uploaded_file in uploaded_files:
+            with st.spinner(f"Processing and embedding {uploaded_file.name}..."):
                 process_uploaded_file(uploaded_file, selected_category)
-            st.success("Files uploaded successfully!")
-            return True
+                st.success(f"✅ {uploaded_file.name} processed and embedded successfully!")
+        return True
+        
     except Exception as e:
-        st.error(f"Error processing files: {str(e)}")
+        st.error(f"❌ Error processing files: {str(e)}")
         return False
 
 def render_category_management():
