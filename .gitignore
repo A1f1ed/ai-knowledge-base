@@ -3,25 +3,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Streamlit secrets file (local only)
-.streamlit/secrets.toml
-
-# --- Test files & Jupyter Notebooks ---
-test_*.py
-test_*.ipynb
-test_*
-.ipynb_checkpoints/
-
-# --- Virtual Environment ---
-venv/
-.venv/
-venv_kbs/
-env/
-ENV/
+*.so
 .Python
-
-# --- Build Artifacts ---
+env/
 build/
 develop-eggs/
 dist/
@@ -33,37 +17,46 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
+# --- Virtual Environment ---
+venv/
+ENV/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Streamlit secrets file (local only)
+.streamlit/secrets.toml
+
+# --- Project specific ---
+data_base/knowledge_db/*
+!data_base/knowledge_db/.gitkeep
+data_base/vector_db/
+token.pickle
+client_secret.json
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Test files & Jupyter Notebooks ---
+test_*.py
+test_*.ipynb
+test_*
+.ipynb_checkpoints/
+
 # --- Secrets and Configs ---
 .env
 .env.*
-client_secret.json
-token.pickle
 sync_record.json
 *.pem
 *.key
-
-# --- Data Files (embeddings, source PDFs) ---
-*.db
-*.sqlite
-*.sqlite3
-*.pkl
-uploads/
-data_base/vector_db/
-data_base/knowledge_db/
-
-# --- Google OAuth Files ---
-google_oauth.md
-
-# --- Editor & System ---
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
 *.log
 *.swp
 *.swo
@@ -80,3 +73,4 @@ reference/
 *.bak
 *.tmp
 sync_record.json
+*.log

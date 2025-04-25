@@ -10,12 +10,20 @@ from streamlit import secrets
 # file upload and management area
 # ============================
 def select_category():
-    st.markdown("### 📂 choose file category")
+    """Select or create a category for file management"""
     categories = get_available_categories()
+    
     if not categories:
         st.warning("No categories available, please create one first")
         return None
-    return st.selectbox("Please select a category", categories, key="upload_category_selector")
+        
+    selected = st.selectbox(
+        "📂 choose file category",
+        options=categories,
+        key="category_selector"
+    )
+    
+    return selected
 
 
 def show_file_manager_dialog(category: str):
@@ -55,39 +63,40 @@ def show_file_manager_dialog(category: str):
 
 def render_upload_section():
     """Render the file upload section in the sidebar"""
+    st.sidebar.markdown("### 📚 Knowledge Base")
+    
+    # Add category management
+    render_category_management()
+    
     # Category selection
     selected_category = select_category()
     
     # Upload files section
-    st.write("📤 Upload Files")
-    uploaded_files = st.file_uploader(
+    st.sidebar.write("📤 Upload Files")
+    uploaded_files = st.sidebar.file_uploader(
         "Choose files to upload",
         accept_multiple_files=True,
         key="file_uploader",
         label_visibility="collapsed"
     )
-
+    
     if uploaded_files:
         process_uploaded_files(uploaded_files, selected_category)
-
+    
     # Show files in current category
-    st.write("📑 Files in Category")
+    st.sidebar.write("📑 Files in Category")
     show_file_manager_dialog(selected_category)
-
-    DRIVE_FOLDER_ID = secrets.get("DRIVE_FOLDER_ID", None)
-
+    
+    st.sidebar.divider()
+    
     # Google Drive sync button
-    st.divider()
-
-    if DRIVE_FOLDER_ID is not None:
-        if st.button("🔄 Sync with Google Drive", use_container_width=True):
-            with st.spinner("Syncing with Google Drive..."):
-                if sync_from_drive():
-                    st.success("Successfully synced with Google Drive!")
-                else:
-                    st.error("Failed to sync with Google Drive.")
-    else:
-        st.warning("🔒 Google Drive Sync is disabled in cloud mode.")
+    if st.sidebar.button("🔄 Sync with Google Drive", use_container_width=True):
+        with st.spinner("Syncing with Google Drive..."):
+            if sync_from_drive():
+                st.success("Successfully synced with Google Drive!")
+                st.rerun()
+            else:
+                st.error("Failed to sync with Google Drive.")
 
 
 # ============================
@@ -236,3 +245,21 @@ def process_uploaded_files(uploaded_files, selected_category):
             process_uploaded_file(uploaded_file, selected_category)
         st.success("Files uploaded successfully!")
         st.rerun()  # refresh to show new files
+
+def render_category_management():
+    """Render the category management section"""
+    st.sidebar.markdown("### 📂 Category Management")
+    
+    # Add new category
+    new_category = st.sidebar.text_input("Add new category", key="new_category").strip()
+    if st.sidebar.button("➕ Add Category", use_container_width=True):
+        if new_category:
+            category_path = Path(KNOWLEDGE_BASE_PATH) / new_category
+            if not category_path.exists():
+                category_path.mkdir(parents=True, exist_ok=True)
+                st.sidebar.success(f"Created category: {new_category}")
+                st.rerun()
+            else:
+                st.sidebar.error("Category already exists!")
+        else:
+            st.sidebar.error("Please enter a category name!")
