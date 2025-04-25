@@ -1,0 +1,79 @@
+# -------------------
+# --- Python Bytecode & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Test files & Jupyter Notebooks ---
+test_*.py
+test_*.ipynb
+test_*
+.ipynb_checkpoints/
+
+# --- Virtual Environment ---
+venv/
+.venv/
+venv_kbs/
+env/
+ENV/
+.Python
+
+# --- Build Artifacts ---
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Secrets and Configs ---
+.env
+.env.*
+client_secret.json
+token.pickle
+sync_record.json
+*.pem
+*.key
+
+# --- Data Files (embeddings, source PDFs) ---
+*.db
+*.sqlite
+*.sqlite3
+*.pkl
+uploads/
+data_base/vector_db/
+data_base/knowledge_db/
+
+# --- Google OAuth Files ---
+google_oauth.md
+
+# --- Editor & System ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+.cache/
+
+# --- Docker (optional for now) ---
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# --- Other ---
+requirements.in
+reference/
+*.bak
+*.tmp
+sync_record.json
