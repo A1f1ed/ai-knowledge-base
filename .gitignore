@@ -61,7 +61,9 @@ sync_record.json
 *.swp
 *.swo
 .cache/
-
+config/token.pickle
+*.db
+google_drive_sync.db
 # --- Docker (optional for now) ---
 Dockerfile
 docker-compose.yml
