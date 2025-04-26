@@ -1,9 +1,9 @@
 # 核心依赖
 streamlit>=1.44.0
 langchain>=0.3.0
-langchain-chroma==0.1.0
+langchain-chroma>=0.1.1
 chromadb==0.4.18
-langchain-huggingface==0.1.2
+langchain-huggingface==0.0.1
 sentence-transformers>=2.0.0
 torch>=2.2.0
 
