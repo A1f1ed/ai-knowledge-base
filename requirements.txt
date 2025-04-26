@@ -1,6 +1,5 @@
 # 基础依赖
 streamlit>=1.44.0
-python-dotenv>=1.0.0
 
 # 文件处理
 pypdf>=3.0.0
@@ -9,3 +8,8 @@ docx2txt>=0.8
 # AI相关依赖
 sentence-transformers>=2.0.0
 torch>=2.2.0
+
+# Google API依赖
+google-api-python-client>=2.0.0
+google-auth-httplib2>=0.1.0
+google-auth-oauthlib>=1.0.0
