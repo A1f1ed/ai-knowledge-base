@@ -6,8 +6,8 @@ import logging
 import streamlit as st
 from typing import List, Optional
 from functools import lru_cache
-import tempfile
 import os
+import tempfile
 
 # === import local modules ===
 from utils.text_splitter import get_text_splitter
@@ -17,7 +17,12 @@ from config.config import VECTOR_DB_PATH, KNOWLEDGE_BASE_PATH
 from langchain.schema import Document
 
 # === LangChain interface ===
-from langchain_community.vectorstores import Chroma as ChromaDB
+try:
+    from langchain_community.vectorstores import Chroma as ChromaDB
+except ImportError:
+    # 为了兼容性，尝试旧的导入路径
+    from langchain.vectorstores import Chroma as ChromaDB
+
 from langchain.retrievers import EnsembleRetriever
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 
