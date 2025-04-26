@@ -3,43 +3,36 @@ import streamlit as st
 from pathlib import Path
 import os
 import shutil
-BASE_PATH = Path("data_base/knowledge_db")
 
 # ensure the knowledge base structure, optional auto-detection of existing categories.
 def ensure_knowledge_base_structure(sync_existing=True):
     """
-    Initialize knowledge base structure, optional auto-detection of existing categories.
+    Initialize knowledge base structure and sync existing categories.
     
     Args:
-        sync_existing (bool): Whether to sync existing folders as categories (including Google Drive / local additions)
+        sync_existing (bool): Whether to sync existing folders as categories
     """
     base_path = KNOWLEDGE_BASE_PATH
     base_path.mkdir(parents=True, exist_ok=True)
-
-    # default categories (optional for first use)
-    default_categories = [
-        'Autobiography', 'history', 'life_weekly',
-        'literature', 'society', 'technology'
-    ]
-
-    # create default categories (only if they do not exist)
-    for category in default_categories:
-        category_path = base_path / category
-        category_path.mkdir(exist_ok=True)
-
-    # sync existing folders as categories (including local / Drive additions or deletions)
+    
+    # 确保 ggbond_knowledge 文件夹存在
+    ggbond_path = base_path / 'ggbond_knowledge'
+    ggbond_path.mkdir(exist_ok=True)
+    
     if sync_existing:
-        existing_folders = [
-            p.name for p in base_path.iterdir() if p.is_dir() and not p.name.startswith('.')
+        # 获取 ggbond_knowledge 下的所有子文件夹作为分类
+        categories = [
+            p.name for p in ggbond_path.iterdir() 
+            if p.is_dir() and not p.name.startswith('.')
         ]
-        return sorted(existing_folders)
-
-    return default_categories
+        return sorted(categories)
+    
+    return []
 
 # get the number of files in a category.
 def get_file_count(category):
     """Get the number of files in a category"""
-    category_path = KNOWLEDGE_BASE_PATH / category
+    category_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge' / category
     if not category_path.exists():
         return 0
     return len([f for f in category_path.iterdir() if f.is_file() and not f.name.startswith('.')])
@@ -48,43 +41,43 @@ def get_file_count(category):
 def delete_category(category):
     """Delete category and its contents"""
     try:
-        category_path = KNOWLEDGE_BASE_PATH / category
+        category_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge' / category
         if category_path.exists():
             shutil.rmtree(category_path)
             return True
     except Exception as e:
-        st.error(f"failed to delete category: {str(e)}")
+        st.error(f"删除分类失败: {str(e)}")
         return False
 
 # delete the specified file.
 def delete_file(category, filename):
     """Delete specified file"""
     try:
-        file_path = KNOWLEDGE_BASE_PATH / category / filename
+        file_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge' / category / filename
         if file_path.exists():
             os.remove(file_path)
             return True
     except Exception as e:
-        st.error(f"failed to delete file: {str(e)}")
+        st.error(f"删除文件失败: {str(e)}")
         return False
 
 # rename the category.
 def rename_category(old_name, new_name):
     """Rename category"""
     try:
-        old_path = KNOWLEDGE_BASE_PATH / old_name
-        new_path = KNOWLEDGE_BASE_PATH / new_name
+        old_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge' / old_name
+        new_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge' / new_name
         if old_path.exists() and not new_path.exists():
             old_path.rename(new_path)
             return True
     except Exception as e:
-        st.error(f"failed to rename category: {str(e)}")
+        st.error(f"重命名分类失败: {str(e)}")
         return False
 
 # get file information.
 def get_file_info(category, filename):
     """Get file information"""
-    file_path = KNOWLEDGE_BASE_PATH / category / filename
+    file_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge' / category / filename
     if file_path.exists():
         stats = file_path.stat()
         return {
@@ -93,35 +86,38 @@ def get_file_info(category, filename):
             'created': stats.st_ctime
         }
     else:
-        st.warning(f"file not found: {file_path}")
+        st.warning(f"找不到文件: {file_path}")
     return None
 
 # get all available category folder names.
 def get_available_categories():
-    """Get all available category folder names"""
-    if not KNOWLEDGE_BASE_PATH.exists():
+    """Get all available category folder names under ggbond_knowledge"""
+    ggbond_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge'
+    if not ggbond_path.exists():
+        ggbond_path.mkdir(parents=True, exist_ok=True)
         return []
 
     categories = [
-        item.name for item in KNOWLEDGE_BASE_PATH.iterdir()
+        item.name for item in ggbond_path.iterdir()
         if item.is_dir() and not item.name.startswith('.')
     ]
+    
     return sorted(categories)
-
-# get the available category folder names in the knowledge base.
-def get_available_categories():
-    """Get the available category folder names in the knowledge base"""
-    if not BASE_PATH.exists():
-        return []
-    return sorted([p.name for p in BASE_PATH.iterdir() if p.is_dir()])
 
 # get the file path list of the specified category.
 def get_files_in_category(category: str):
     """Get the file path list of the specified category"""
-    category_path = KNOWLEDGE_BASE_PATH / category
+    category_path = KNOWLEDGE_BASE_PATH / 'ggbond_knowledge' / category
     if not category_path.exists():
+        st.warning(f"分类 {category} 不存在")
         return []
-    return sorted([f.name for f in category_path.iterdir() if f.is_file() and not f.name.startswith('.')])
+        
+    files = sorted([f.name for f in category_path.iterdir() if f.is_file() and not f.name.startswith('.')])
+    if files:
+        st.success(f"在分类 {category} 中找到 {len(files)} 个文件")
+    else:
+        st.info(f"分类 {category} 中没有文件")
+    return files
 
 __all__ = [
     "ensure_knowledge_base_structure",

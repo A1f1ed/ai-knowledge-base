@@ -9,7 +9,9 @@ from .config import (
     KNOWLEDGE_BASE_PATH, VECTOR_DB_PATH,
     CHUNK_SIZE, CHUNK_OVERLAP, TEXT_SEPARATORS,
     GOOGLE_API_KEY, GOOGLE_CSE_ID, USE_WEB_SEARCH,
-    DRIVE_FOLDER_ID
+    DRIVE_FOLDER_ID, VECTOR_DRIVE_FOLDER_ID,
+    CREDENTIALS_PATH, TOKEN_PATH,
+    get_google_creds, is_streamlit_env, get_config_value
 )
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     "KNOWLEDGE_BASE_PATH", "VECTOR_DB_PATH",
     "CHUNK_SIZE", "CHUNK_OVERLAP", "TEXT_SEPARATORS",
     "GOOGLE_API_KEY", "GOOGLE_CSE_ID", "USE_WEB_SEARCH",
-    "DRIVE_FOLDER_ID"
+    "DRIVE_FOLDER_ID", "VECTOR_DRIVE_FOLDER_ID",
+    "CREDENTIALS_PATH", "TOKEN_PATH",
+    "get_google_creds", "is_streamlit_env", "get_config_value"
 ]

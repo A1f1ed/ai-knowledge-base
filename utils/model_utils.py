@@ -37,18 +37,34 @@ def get_llm(selected_model: str, api_key: str = None):
     Currently only supports local Ollama models.
     """
     if selected_model not in AVAILABLE_MODELS:
-        st.error(f"❌ model '{selected_model}' is not in the allowed model list")
+        st.error(f"❌ 模型 '{selected_model}' 不在允许的模型列表中")
         return None
 
     try:
+        # 首先检查Ollama服务是否可用
+        if not check_ollama_status():
+            error_msg = "❌ Ollama服务不可用。请确保您已安装并启动Ollama服务（https://ollama.ai/）"
+            st.error(error_msg)
+            logger.error(error_msg)
+            return None
+            
+        # 检查所需的LLM模型是否可用
+        models = get_available_ollama_models()
+        if selected_model not in models:
+            error_msg = f"❌ 模型 '{selected_model}' 在Ollama服务中不可用。请运行 'ollama pull {selected_model}' 下载模型"
+            st.error(error_msg)
+            logger.error(error_msg)
+            return None
+            
         return ChatOllama(
             model=selected_model,
             temperature=TEMPERATURE,
             base_url=OLLAMA_URL
         )
     except Exception as e:
-        st.error(f"❌ failed to load model: {e}")
-        logger.error(f"failed to load LLM model: {e}", exc_info=True)
+        error_msg = f"❌ 无法加载模型: {e}"
+        st.error(error_msg)
+        logger.error(error_msg, exc_info=True)
         return None
 
 # ===================================
@@ -61,12 +77,28 @@ def get_embedding_model():
     """
     try:
         print(f"[DEBUG] the current embedding model is: {EMBEDDING_MODEL}")
+        
+        # 首先检查Ollama服务是否可用
+        if not check_ollama_status():
+            error_msg = "❌ Ollama服务不可用。请确保您已安装并启动Ollama服务（https://ollama.ai/）"
+            st.error(error_msg)
+            logger.error(error_msg)
+            return None
+            
+        # 检查所需的嵌入模型是否可用
+        models = get_available_ollama_models()
+        if EMBEDDING_MODEL not in models and not EMBEDDING_MODEL.startswith("bge-"):
+            error_msg = f"❌ 嵌入模型 '{EMBEDDING_MODEL}' 在Ollama服务中不可用。请运行 'ollama pull {EMBEDDING_MODEL}' 下载模型"
+            st.error(error_msg)
+            logger.error(error_msg)
+            return None
+            
         from utils.model_utils import LocalOllamaEmbeddingModel
         return LocalOllamaEmbeddingModel()
     except Exception as e:
-        st.error(f"❌ failed to load embedding model: {e}")
-        logger.error(f"failed to load embedding model: {e}", exc_info=True)
-        
+        error_msg = f"❌ 无法加载嵌入模型: {e}"
+        st.error(error_msg)
+        logger.error(error_msg, exc_info=True)
         return None
 
 # ===================================
@@ -77,9 +109,17 @@ def check_ollama_status():
     Check if the local Ollama model service is running.
     """
     try:
-        res = requests.get(f"{OLLAMA_URL}/api/tags")
-        return res.status_code == 200
-    except Exception:
+        print(f"[DEBUG] 尝试连接Ollama服务: {OLLAMA_URL}")
+        res = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+        if res.status_code == 200:
+            print(f"[DEBUG] Ollama服务连接成功: {res.status_code}")
+            print(f"[DEBUG] 可用模型: {[m['name'] for m in res.json().get('models', [])]}")
+            return True
+        else:
+            print(f"[DEBUG] Ollama服务返回错误状态码: {res.status_code}")
+            return False
+    except Exception as e:
+        print(f"[DEBUG] 连接Ollama服务失败: {str(e)}")
         return False
 
 # ===================================

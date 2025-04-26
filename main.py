@@ -1,4 +1,7 @@
 import streamlit as st
+import logging
+import sys
+from pathlib import Path
 from components.ui import (
     render_sidebar_controls,
     render_upload_section,
@@ -7,9 +10,36 @@ from components.ui import (
     render_chat_box,
 )
 
-def main():
-    st.set_page_config(layout="wide")
+# 设置页面配置（必须是第一个 Streamlit 命令）
+st.set_page_config(
+    page_title="Knowledge Base",
+    page_icon="📚",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# 错误处理装饰器
+def handle_errors(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error(f"Error in {func.__name__}: {str(e)}")
+            st.error(f"An error occurred: {str(e)}")
+            if st.button("Retry"):
+                st.experimental_rerun()
+    return wrapper
+
+def main():
     # Combine all sidebar components
     with st.sidebar:
         # st.title("🧠 AI Assistant Settings")

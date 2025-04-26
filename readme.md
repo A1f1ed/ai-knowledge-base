@@ -1,61 +1,109 @@
-# Knowledge Base Assistant
+## License
 
-A powerful knowledge base management system with AI-powered question answering capabilities.
+⚠️ This repository is for classroom demo only. Please do not reuse or fork this repo.
 
-## Why This Project?
+# Personal Knowledge Base
 
-Managing large personal or team knowledge collections can be overwhelming.  
-This assistant helps you query, organize, and update your documents with AI support – all locally and securely.
+A local-first personal knowledge base application that integrates document management, vector embedding, and AI-powered Q&A capabilities.
 
 ## Features
 
-- 📚 Knowledge Base Management
-  - Organize documents by categories
-  - Upload multiple file formats
-  - Google Drive integration for file sync
-  - Easy file management (upload, delete, browse)
+- **Document Management**: Upload, categorize, and organize documents in a multi-level folder structure
+- **Google Drive Sync**: Automatically sync documents with Google Drive for backup and accessibility
+- **Vector Search**: Convert documents into semantic vectors for efficient retrieval
+- **AI Question Answering**: Ask questions about your documents in natural language
+- **Privacy-First**: Run locally with your own models, keeping your data private
 
-- 🤖 AI-Powered Chat Modes
-  - Free Chat: Web + Local knowledge fallback
-  - Category Q&A: Query specific document sets
-  - Knowledge Base: Search across all documents
-  
-- 🔍 Advanced Features
-  - Web search integration
-  - Multiple AI model support
-  - Source citation for answers
-  - Real-time chat interface
+## Getting Started
 
-## Quick Start
+### Prerequisites
 
+- Python 3.10+
+- Docker (optional, for running Ollama)
+- Google account (for Drive integration)
 
-### Manual Setup
+### Installation
 
-1. Clone the repository:
+1. Clone this repository
 ```bash
-git clone [repository-url]
-cd knowledge-base-assistant
+git clone https://github.com/yourusername/personal-knowledge-base.git
+cd personal-knowledge-base
 ```
 
-2. Install dependencies:
+2. Create a virtual environment
+```bash
+python -m venv venv_kbs
+source venv_kbs/bin/activate  # On Windows: venv_kbs\Scripts\activate
+```
+
+3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the application:
+4. Set up Google Drive API
+   - Create a project in [Google Cloud Console](https://console.cloud.google.com/)
+   - Enable Google Drive API
+   - Create OAuth 2.0 credentials
+   - Download the credentials as `client_secret.json` and place in the project root
+
+5. Configure environment variables by copying the example
+```bash
+cp .env.example .env
+```
+
+6. Set up Ollama (for local LLM)
+   - Install [Ollama](https://ollama.ai/) or use the Docker configuration
+   - Pull required models:
+```bash
+ollama pull mistral:7b-instruct
+ollama pull bge-m3:latest
+```
+
+### Running the Application
+
+**Option 1: Local Development**
 ```bash
 streamlit run main.py
 ```
 
+**Option 2: Using Docker**
+```bash
+docker-compose up -d
+```
+
 ## Configuration
 
-1. Google Drive Integration (Optional):
-- Place your `client_secret.json` in the project root
-- First sync will require authentication
+Edit the `.env` file to customize your setup:
 
-2. AI Model Selection:
-- Default: Mistral 7B (requires Ollama)
-- Can be configured in settings
+- `OLLAMA_URL`: URL for your Ollama instance (default: http://localhost:11434)
+- `DRIVE_FOLDER_ID`: Google Drive folder ID for document storage
+- `VECTOR_DRIVE_FOLDER_ID`: Google Drive folder ID for vector database backup
+- `USE_WEB_SEARCH`: Enable/disable web search for question answering
+
+## Architecture
+
+- **Frontend**: Streamlit-based UI for interaction
+- **Document Processing**: Converts documents to vectors using embedding models
+- **Vector Database**: ChromaDB for efficient semantic search
+- **LLM Integration**: Local Ollama models (default: Mistral 7B)
+- **Storage**: Local files with Google Drive synchronization
+
+## Deploying to Streamlit Cloud
+
+1. Push your code to GitHub
+2. Connect your repository in Streamlit Cloud
+3. Configure the following secrets in Streamlit Cloud:
+   - `google_creds`: Content of your Google credentials JSON file
+   - Add any additional environment variables from your `.env` file
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Project Structure
 
@@ -82,7 +130,5 @@ knowledge-base-assistant/
 - Web search is optional and can be enabled/disabled
 - All chat history is session-based and not persisted
 
-## License
 
-MIT License
 

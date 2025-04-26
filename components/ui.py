@@ -5,6 +5,7 @@ from core.document_chat_controller import process_uploaded_file
 from services.google_drive_service import sync_from_drive
 from config.config import KNOWLEDGE_BASE_PATH
 from streamlit import secrets
+import time
 
 # ============================
 # file upload and management area
@@ -73,42 +74,48 @@ def render_upload_section():
     
     # Upload files section
     st.sidebar.write("📤 Upload Files")
-    
-    # Add file size limit warning
     st.sidebar.caption("Limit 200MB per file")
+    
+    # Use a unique key for the file uploader
+    upload_key = f"file_uploader_{selected_category}" if selected_category else "file_uploader"
+    
+    # Initialize upload state if needed
+    if "files_processed" not in st.session_state:
+        st.session_state.files_processed = set()
     
     uploaded_files = st.sidebar.file_uploader(
         "Choose files to upload",
         accept_multiple_files=True,
-        key="file_uploader",
+        key=upload_key,
         label_visibility="collapsed"
     )
     
     # Process uploaded files
-    if uploaded_files:
-        upload_success = process_uploaded_files(uploaded_files, selected_category)
-        if upload_success:
-            # Clear the file uploader
-            st.session_state.file_uploader = None
-            st.rerun()
+    if uploaded_files and selected_category:
+        try:
+            for uploaded_file in uploaded_files:
+                # Skip if file was already processed
+                if uploaded_file.name in st.session_state.files_processed:
+                    continue
+                    
+                with st.spinner(f"Processing {uploaded_file.name}..."):
+                    process_uploaded_file(uploaded_file, selected_category)
+                    st.success(f"✅ {uploaded_file.name} processed successfully!")
+                    st.session_state.files_processed.add(uploaded_file.name)
+            
+            # Clear upload state after successful processing
+            if len(uploaded_files) > 0:
+                time.sleep(0.5)  # Brief pause to ensure UI updates are visible
+                st.rerun()
+                    
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
+    elif uploaded_files and not selected_category:
+        st.error("Please select a category first")
     
     # Show files in current category
     st.sidebar.write("📑 Files in Category")
     show_file_manager_dialog(selected_category)
-    
-    st.sidebar.divider()
-    
-    # Google Drive sync button
-    if st.sidebar.button("🔄 Sync with Google Drive", use_container_width=True):
-        with st.spinner("Syncing with Google Drive..."):
-            try:
-                if sync_from_drive():
-                    st.success("Successfully synced with Google Drive!")
-                    st.rerun()
-                else:
-                    st.error("Failed to sync with Google Drive.")
-            except Exception as e:
-                st.error(f"Error during sync: {str(e)}")
 
 
 # ============================
@@ -180,15 +187,16 @@ def render_chat_box(
     
     # Add refresh button
     if st.button("🔄 Refresh Chat", key="refresh_chat"):
-        st.session_state.chat_history = []
+        if "messages" in st.session_state:
+            del st.session_state.messages
         st.rerun()
     
     # initialize chat history
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
     
     # show chat history
-    for message in st.session_state.chat_history:
+    for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
     
@@ -207,7 +215,7 @@ def render_chat_box(
                 user_question=user_input,
                 chat_mode=chat_mode,
                 selected_model=selected_model,
-                chat_history=st.session_state.chat_history,
+                chat_history=[],  # 不传递聊天历史，避免影响回答
                 web_search_enabled=web_search_enabled,
                 selected_category=selected_category,
                 selected_docs=selected_docs,
@@ -218,10 +226,8 @@ def render_chat_box(
             st.write(answer)
 
         # update chat history
-        st.session_state.chat_history.extend([
-            {"role": "user", "content": user_input},
-            {"role": "assistant", "content": answer}
-        ])
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        st.session_state.messages.append({"role": "assistant", "content": answer})
 
         if sources:
             with st.expander("📎 Sources"):
@@ -246,32 +252,40 @@ def render_sidebar():
                 else:
                     st.error("sync failed, please check the logs")
 
-def process_uploaded_files(uploaded_files, selected_category):
-    """Process uploaded files and save them to the selected category"""
-    if not selected_category:
-        st.error("Please select a category first")
-        return False
-        
-    try:
-        for uploaded_file in uploaded_files:
-            with st.spinner(f"Processing and embedding {uploaded_file.name}..."):
-                process_uploaded_file(uploaded_file, selected_category)
-                st.success(f"✅ {uploaded_file.name} processed and embedded successfully!")
-        return True
-        
-    except Exception as e:
-        st.error(f"❌ Error processing files: {str(e)}")
-        return False
-
 def render_category_management():
     """Render the category management section"""
     st.sidebar.markdown("### 📂 Category Management")
     
+    # 获取现有分类
+    categories = get_available_categories()
+    
+    # 显示现有分类的选择框
+    if categories:
+        selected_category = st.sidebar.selectbox(
+            "Select Category",
+            options=categories,
+            key="category_management_selector"
+        )
+        
+        # 如果选择了分类，显示该分类下的文件
+        if selected_category:
+            st.sidebar.markdown(f"**Files in {selected_category}:**")
+            files = get_files_in_category(selected_category)
+            if files:
+                for file in files:
+                    st.sidebar.text(f"📄 {file}")
+            else:
+                st.sidebar.info("No files in this category")
+    else:
+        st.sidebar.info("No categories available")
+    
+    st.sidebar.divider()
+    
     # Add new category
     new_category = st.sidebar.text_input("Add new category", key="new_category").strip()
-    if st.sidebar.button("➕ Add Category", use_container_width=True):
+    if st.sidebar.button("➕ Add Category", key="add_category_button", use_container_width=True):
         if new_category:
-            category_path = Path(KNOWLEDGE_BASE_PATH) / new_category
+            category_path = Path(KNOWLEDGE_BASE_PATH) / 'ggbond_knowledge' / new_category
             if not category_path.exists():
                 category_path.mkdir(parents=True, exist_ok=True)
                 st.sidebar.success(f"Created category: {new_category}")
@@ -280,3 +294,17 @@ def render_category_management():
                 st.sidebar.error("Category already exists!")
         else:
             st.sidebar.error("Please enter a category name!")
+    
+    # Google Drive sync button
+    st.sidebar.divider()
+    if st.sidebar.button("🔄 Sync with Google Drive", key="sync_drive_button", use_container_width=True):
+        with st.spinner("Syncing with Google Drive..."):
+            try:
+                if sync_from_drive():
+                    st.success("Successfully synced with Google Drive!")
+                    # 强制重新加载页面以显示更新后的分类和文件
+                    st.rerun()
+                else:
+                    st.error("Failed to sync with Google Drive.")
+            except Exception as e:
+                st.error(f"Error during sync: {str(e)}")
