@@ -125,7 +125,7 @@ def render_sidebar_controls():
     st.sidebar.title("🧠 AI Assistant Settings")
     selected_model = st.sidebar.selectbox(
         "Choose a model:",
-        ["mistral:7b-instruct", "deepseek-coder:6.7b"],
+        ["mistral:7b-instruct", "deepseek-coder"],
         key="model_selector",
     )
     use_web = st.sidebar.checkbox("🌐 Use Web Search", key="use_web_checkbox")
