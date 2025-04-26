@@ -14,3 +14,9 @@ torch>=2.2.0
 google-api-python-client>=2.0.0
 google-auth-httplib2>=0.1.0
 google-auth-oauthlib>=1.0.0
+
+# LangChain相关
+langchain>=0.3.0
+langchain-text-splitters>=0.0.1
+langchain-community>=0.0.1
+chromadb==0.4.18
