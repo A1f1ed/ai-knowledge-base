@@ -6,6 +6,8 @@ import logging
 import streamlit as st
 from typing import List, Optional
 from functools import lru_cache
+import tempfile
+import os
 
 # === import local modules ===
 from utils.text_splitter import get_text_splitter
@@ -22,12 +24,19 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 # === Chroma configuration ===
 from chromadb.config import Settings
 
+# Use a temporary directory for cloud environment if needed
+TEMP_DIR = tempfile.gettempdir()
+
+# Configure ChromaDB settings for better compatibility
 CHROMA_SETTINGS = Settings(
-    anonymized_telemetry=False
+    anonymized_telemetry=False,
+    allow_reset=True,
+    is_persistent=True
 )
 
 # === Logger settings ===
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 def get_chroma_instance(persist_dir: str, embedding_model=None) -> Optional[ChromaDB]:
     """
@@ -39,14 +48,35 @@ def get_chroma_instance(persist_dir: str, embedding_model=None) -> Optional[Chro
             return None
             
     try:
+        # Ensure the directory exists
+        Path(persist_dir).mkdir(parents=True, exist_ok=True)
+        
+        # Try to create ChromaDB with specified settings
         return ChromaDB(
             persist_directory=persist_dir,
             embedding_function=embedding_model,
-            collection_name="default"
+            collection_name="default",
+            client_settings=CHROMA_SETTINGS
         )
     except Exception as e:
         logger.error(f"[VectorDB] Failed to initialize ChromaDB: {e}")
-        return None
+        logger.error(traceback.format_exc())
+        
+        # Fallback to temp directory if there's an issue with the specified directory
+        try:
+            fallback_dir = os.path.join(TEMP_DIR, "chroma_fallback", Path(persist_dir).name)
+            Path(fallback_dir).mkdir(parents=True, exist_ok=True)
+            logger.info(f"[VectorDB] Falling back to temporary directory: {fallback_dir}")
+            
+            return ChromaDB(
+                persist_directory=fallback_dir,
+                embedding_function=embedding_model,
+                collection_name="default",
+                client_settings=CHROMA_SETTINGS
+            )
+        except Exception as fallback_e:
+            logger.error(f"[VectorDB] Fallback also failed: {fallback_e}")
+            return None
 
 # ==================================================================
 # 📊 ensure the vector database folder structure
@@ -382,6 +412,8 @@ def embed_single_file(file_path: Path, category: str = None) -> bool:
     try:
         from services.google_drive_service import GoogleDriveService
         
+        logger.info(f"[VectorDB] Starting embedding process for: {file_path}")
+        
         # Get relative path from knowledge base root
         try:
             relative_path = file_path.relative_to(KNOWLEDGE_BASE_PATH)
@@ -390,25 +422,39 @@ def embed_single_file(file_path: Path, category: str = None) -> bool:
                 category_path = relative_path.parent
             else:
                 category_path = Path(category)
-        except ValueError:
+            logger.info(f"[VectorDB] Using category path: {category_path}")
+        except ValueError as e:
             # If file is not under KNOWLEDGE_BASE_PATH, and no category is provided
             if category is None:
                 logger.error(f"[VectorDB] File {file_path} is not under knowledge base path and no category provided")
                 return False
             category_path = Path(category)
             relative_path = Path(category) / file_path.name
+            logger.info(f"[VectorDB] File outside knowledge base directory, using category: {category}")
             
-        vector_db_path = VECTOR_DB_PATH / category_path
+        # Handle possible errors with vector database path
+        try:
+            vector_db_path = VECTOR_DB_PATH / category_path
+            # Ensure the directory exists
+            vector_db_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            # Fallback to temporary directory if needed
+            logger.warning(f"[VectorDB] Error creating vector database path: {str(e)}")
+            vector_db_path = Path(os.path.join(TEMP_DIR, "vectordb", str(category_path)))
+            vector_db_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"[VectorDB] Using fallback directory: {vector_db_path}")
         
         # Create text splitter
         text_splitter = get_text_splitter()
         
         # Load and process the file
+        logger.info(f"[VectorDB] Loading document: {file_path}")
         docs = load_single_document(file_path)
         if not docs:
             logger.warning(f"[VectorDB] Empty document: {file_path}")
             return False
             
+        logger.info(f"[VectorDB] Document loaded successfully. Adding metadata...")
         # Add metadata
         for doc in docs:
             doc.metadata["source"] = str(file_path)
@@ -416,40 +462,64 @@ def embed_single_file(file_path: Path, category: str = None) -> bool:
             doc.metadata["category"] = str(category_path)
             
         # Split documents
+        logger.info(f"[VectorDB] Splitting documents...")
         split_docs = text_splitter.split_documents(docs)
+        logger.info(f"[VectorDB] Created {len(split_docs)} document chunks")
             
         # Get embedding model
+        logger.info(f"[VectorDB] Getting embedding model...")
         embedding_model = get_embedding_model()
         if not embedding_model:
+            logger.error("[VectorDB] Failed to get embedding model")
             raise Exception("Failed to get embedding model")
             
-        # Ensure vector store directory exists
-        vector_db_path.mkdir(parents=True, exist_ok=True)
-        
         # Create or update vector store
-        vectordb = ChromaDB.from_documents(
-            documents=split_docs,
-            embedding=embedding_model,
-            persist_directory=str(vector_db_path),
-            client_settings=CHROMA_SETTINGS
-        )
-        vectordb.persist()
+        logger.info(f"[VectorDB] Creating vector store at: {vector_db_path}")
+        try:
+            # First try with default settings
+            vectordb = ChromaDB.from_documents(
+                documents=split_docs,
+                embedding=embedding_model,
+                persist_directory=str(vector_db_path),
+                client_settings=CHROMA_SETTINGS
+            )
+            vectordb.persist()
+        except Exception as e:
+            # If fails, try with fallback directory
+            logger.warning(f"[VectorDB] Error creating vector store: {str(e)}. Trying with fallback...")
+            fallback_path = Path(os.path.join(TEMP_DIR, "chroma_fallback", str(category_path).replace("/", "_")))
+            fallback_path.mkdir(parents=True, exist_ok=True)
+            vectordb = ChromaDB.from_documents(
+                documents=split_docs,
+                embedding=embedding_model,
+                persist_directory=str(fallback_path),
+                client_settings=CHROMA_SETTINGS
+            )
+            vectordb.persist()
+            logger.info(f"[VectorDB] Successfully used fallback directory: {fallback_path}")
         
         # Also update global vector store
+        logger.info(f"[VectorDB] Updating global vector store...")
         if not update_global_vectordb_with_file(file_path):
             logger.warning(f"[VectorDB] Failed to update global vector store for: {file_path}")
         
         # Sync to Google Drive if needed
-        drive_service = GoogleDriveService()
-        if drive_service.sync_vector_store(str(category_path)):
-            logging.info(f"Vector store synced to Drive for path: {category_path}")
-        else:
-            logging.warning(f"Failed to sync vector store to Drive for path: {category_path}")
+        try:
+            logger.info(f"[VectorDB] Syncing to Google Drive...")
+            drive_service = GoogleDriveService()
+            if drive_service.sync_vector_store(str(category_path)):
+                logger.info(f"Vector store synced to Drive for path: {category_path}")
+            else:
+                logger.warning(f"Failed to sync vector store to Drive for path: {category_path}")
+        except Exception as e:
+            logger.warning(f"[VectorDB] Error syncing to Google Drive: {str(e)}")
         
+        logger.info(f"[VectorDB] Successfully embedded file: {file_path}")
         return True
         
     except Exception as e:
         logging.error(f"Error embedding file {file_path}: {str(e)}")
+        logging.error(traceback.format_exc())
         st.error(f"向量化失败: {file_path.name} - {str(e)}")
         return False
 

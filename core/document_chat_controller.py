@@ -4,6 +4,7 @@ import logging
 import tempfile
 import os
 import pickle
+import traceback
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
@@ -11,6 +12,7 @@ import io
 import streamlit as st
 from services.google_drive_service import GoogleDriveService
 from utils.vectordb_utils import embed_single_file
+from utils.file_utils import save_uploaded_file
 
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -18,6 +20,13 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from chromadb.config import Settings
 
 from config.config import KNOWLEDGE_BASE_PATH, VECTOR_DB_PATH, DRIVE_FOLDER_ID, TOKEN_PATH
+
+# Create a temporary directory for fallback
+TEMP_DIR = tempfile.gettempdir()
+
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_embedding_model():
     """Get the embedding model with error handling"""
@@ -28,8 +37,10 @@ def get_embedding_model():
             encode_kwargs={'normalize_embeddings': True}
         )
     except Exception as e:
-        logging.error(f"Failed to initialize embedding model: {str(e)}")
-        raise RuntimeError("Failed to initialize embedding model. Please check if the model is available.")
+        logger.error(f"Failed to initialize embedding model: {str(e)}")
+        logger.error(traceback.format_exc())
+        # Instead of raising immediately, return None and let callers handle it
+        return None
 
 def initialize_chroma(vector_db_path: Path, embedding_model):
     """Initialize Chroma with proper settings for cloud environment"""
@@ -39,16 +50,34 @@ def initialize_chroma(vector_db_path: Path, embedding_model):
         
         # 配置 ChromaDB 设置
         chroma_settings = Settings(
-            anonymized_telemetry=False
+            anonymized_telemetry=False,
+            allow_reset=True,
+            is_persistent=True
         )
         
         return Chroma(
             persist_directory=str(vector_db_path),
-            embedding_function=embedding_model
+            embedding_function=embedding_model,
+            client_settings=chroma_settings
         )
     except Exception as e:
-        logging.error(f"Failed to initialize Chroma: {str(e)}")
-        raise RuntimeError(f"Failed to initialize vector database: {str(e)}")
+        logger.error(f"Failed to initialize Chroma: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # Try to use a temporary directory as fallback
+        try:
+            fallback_dir = os.path.join(TEMP_DIR, "chroma_fallback", vector_db_path.name)
+            os.makedirs(fallback_dir, exist_ok=True)
+            logger.info(f"Trying fallback directory for Chroma: {fallback_dir}")
+            
+            return Chroma(
+                persist_directory=fallback_dir,
+                embedding_function=embedding_model,
+                client_settings=chroma_settings
+            )
+        except Exception as fallback_e:
+            logger.error(f"Fallback initialization also failed: {str(fallback_e)}")
+            raise RuntimeError(f"Failed to initialize vector database even with fallback: {str(e)}")
 
 def get_google_drive_service():
     """Initialize Google Drive service"""
@@ -206,20 +235,33 @@ def process_uploaded_file(uploaded_file, category: str):
         temp_path = Path(save_uploaded_file(uploaded_file, category))
         
         # 上传文件到Google Drive
-        file_content = uploaded_file.read()
-        upload_status, result = drive_service.upload_file(temp_path, category)
-        if not upload_status:
-            st.error(f"Failed to upload file to Google Drive: {result}")
+        try:
+            file_content = uploaded_file.read()
+            uploaded_file.seek(0)  # Reset position for subsequent reads
+            upload_status, result = drive_service.upload_file(temp_path, category)
+            if not upload_status:
+                st.error(f"Failed to upload file to Google Drive: {result}")
+                return False
+        except Exception as e:
+            logger.error(f"Error during file upload: {str(e)}")
+            st.error(f"Upload error: {str(e)}")
             return False
             
         # 向量化文件
-        if not embed_single_file(temp_path, category):
-            st.error(f"Failed to vectorize file: {uploaded_file.name}")
+        try:
+            if not embed_single_file(temp_path, category):
+                st.error(f"Failed to vectorize file: {uploaded_file.name}")
+                return False
+        except Exception as e:
+            logger.error(f"Error during vectorization: {str(e)}")
+            st.error(f"Vectorization error: {str(e)}")
             return False
             
         return True
         
     except Exception as e:
+        logger.error(f"Error processing file: {str(e)}")
+        logger.error(traceback.format_exc())
         st.error(f"Error processing file: {str(e)}")
         return False
 

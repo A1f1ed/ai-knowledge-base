@@ -1,8 +1,18 @@
 [server]
 runOnSave = true
+enableXsrfProtection = false
+enableCORS = false
+maxUploadSize = 200
 
 [runner]
 pythonVersion = "3.10"
 
 [browser]
-gatherUsageStats = false 
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#F63366"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif" 
