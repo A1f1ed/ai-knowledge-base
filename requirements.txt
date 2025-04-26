@@ -9,3 +9,25 @@ docx2txt>=0.8
 # AI相关依赖
 sentence-transformers>=2.0.0
 torch>=2.2.0
+
+# Google API依赖
+google-api-python-client>=2.0.0
+google-auth-httplib2>=0.1.0
+google-auth-oauthlib>=1.0.0
+
+# LangChain相关
+langchain>=0.3.0
+langchain-text-splitters>=0.0.1
+langchain-community>=0.0.1
+langchain-chroma>=0.0.1
+langchain-huggingface>=0.0.1
+langchain-ollama>=0.0.1
+chromadb==0.3.26  # 使用更旧但兼容NumPy 2.0的版本
+
+# 日期处理
+python-dateutil>=2.8.2
+
+# 网络请求
+requests>=2.25.0
+
+numpy==1.24.3  # 指定一个已知兼容的版本
