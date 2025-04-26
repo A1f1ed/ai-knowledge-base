@@ -19,4 +19,14 @@ google-auth-oauthlib>=1.0.0
 langchain>=0.3.0
 langchain-text-splitters>=0.0.1
 langchain-community>=0.0.1
+langchain-chroma>=0.0.1
+langchain-huggingface>=0.0.1
+langchain-ollama>=0.0.1
 chromadb==0.4.18
+
+# 日期处理
+python-dateutil>=2.8.2
+
+# 网络请求
+requests>=2.25.0
+dateutil>=2.8.0
