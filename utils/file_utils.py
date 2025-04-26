@@ -95,8 +95,24 @@ def save_uploaded_files(category: Union[str, list], uploaded_files: list) -> lis
 
 # save a single uploaded file.
 def save_uploaded_file(uploaded_file, category: str) -> str:
-    # Ensure directory exists
-    category_path = KNOWLEDGE_BASE_PATH / category
+    """
+    Save a single uploaded file to the appropriate category path.
+    
+    Args:
+        uploaded_file: The file to save
+        category: The category path, which may include multiple levels (e.g. 'category/subcategory')
+    
+    Returns:
+        str: The path where the file was saved
+    """
+    # Ensure directory exists - support multi-level categories
+    category_path = KNOWLEDGE_BASE_PATH
+    if category:
+        # Handle potential multi-level category paths
+        for part in category.split('/'):
+            if part.strip():
+                category_path = category_path / part
+    
     category_path.mkdir(parents=True, exist_ok=True)
 
     # Generate file save path
@@ -105,7 +121,8 @@ def save_uploaded_file(uploaded_file, category: str) -> str:
     # Save file content
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
-
+    
+    logger.info(f"Saved file {uploaded_file.name} to {file_path}")
     return str(file_path)
 
 # load a single document and return a LangChain document list.

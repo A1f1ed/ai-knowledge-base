@@ -1,0 +1,8 @@
+[server]
+runOnSave = true
+
+[runner]
+pythonVersion = "3.10"
+
+[browser]
+gatherUsageStats = false 

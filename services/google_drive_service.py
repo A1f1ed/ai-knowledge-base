@@ -503,21 +503,79 @@ class GoogleDriveService:
             logging.error(f"Failed to load vector store: {str(e)}")
             return False
 
-    def upload_file(self, file_content, filename: str, category: str):
-        """Upload file to Google Drive"""
+    def upload_file(self, source_file_path, category: str):
+        """
+        Upload file to Google Drive with support for multi-level category structure.
+        
+        Args:
+            source_file_path: Path to the source file to upload
+            category: Category path, can include multiple levels (e.g. 'category/subcategory')
+            
+        Returns:
+            tuple: (status, drive_id) where status is a boolean indicating success,
+                   and drive_id is either the file id on success or error message on failure
+        """
         try:
-            # 首先检查或创建分类文件夹
-            category_folder_id = self.get_or_create_folder(category)
-            if not category_folder_id:
-                raise Exception(f"Failed to create/find category folder: {category}")
-
-            # 准备文件元数据
+            # Open file to upload
+            with open(source_file_path, 'rb') as f:
+                file_content = f.read()
+            
+            # Get the filename from the path
+            filename = Path(source_file_path).name
+            
+            # Split category into parts for multi-level structure
+            category_parts = category.split('/')
+            
+            # Start with the main knowledge base folder
+            parent_id = DRIVE_FOLDER_ID
+            current_path = ""
+            
+            # Create each folder in the path if it doesn't exist
+            for part in category_parts:
+                if not part:  # Skip empty parts
+                    continue
+                    
+                current_path += f"/{part}" if current_path else part
+                logging.info(f"Checking/creating folder: {current_path}")
+                
+                # Check if folder exists at this level
+                query = f"name='{part}' and '{parent_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                results = self.service.files().list(
+                    q=query,
+                    fields="files(id, name)",
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True
+                ).execute()
+                
+                files = results.get('files', [])
+                if files:
+                    # Folder exists, use as next parent
+                    parent_id = files[0]['id']
+                else:
+                    # Create new folder at this level
+                    folder_metadata = {
+                        'name': part,
+                        'mimeType': 'application/vnd.google-apps.folder',
+                        'parents': [parent_id]
+                    }
+                    folder = self.service.files().create(
+                        body=folder_metadata,
+                        fields='id',
+                        supportsAllDrives=True
+                    ).execute()
+                    
+                    logging.info(f"Created new folder: {part} in {current_path}")
+                    parent_id = folder['id']
+            
+            # Now parent_id contains the ID of the deepest folder in the path
+            
+            # Prepare file metadata
             file_metadata = {
                 'name': filename,
-                'parents': [category_folder_id]
+                'parents': [parent_id]
             }
 
-            # 创建媒体对象
+            # Create media object
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(
                 fh,
@@ -525,54 +583,20 @@ class GoogleDriveService:
                 resumable=True
             )
 
-            # 上传文件
+            # Upload file
             file = self.service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id'
             ).execute()
 
-            logging.info(f"File uploaded successfully: {filename}")
-            return True
+            logging.info(f"File uploaded successfully: {filename} to {category}")
+            return True, file['id']
 
         except Exception as e:
-            logging.error(f"Failed to upload file: {str(e)}")
-            return False
-
-    def get_or_create_folder(self, folder_name: str):
-        """Get or create a folder in Google Drive"""
-        try:
-            # 首先检查文件夹是否已存在
-            query = f"name='{folder_name}' and '{DRIVE_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
-            results = self.service.files().list(
-                q=query,
-                fields="files(id, name)",
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True
-            ).execute()
-
-            files = results.get('files', [])
-            if files:
-                return files[0]['id']
-
-            # 如果文件夹不存在，创建它
-            folder_metadata = {
-                'name': folder_name,
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [DRIVE_FOLDER_ID]
-            }
-            folder = self.service.files().create(
-                body=folder_metadata,
-                fields='id',
-                supportsAllDrives=True
-            ).execute()
-            
-            logging.info(f"Created new folder: {folder_name}")
-            return folder['id']
-
-        except Exception as e:
-            logging.error(f"Failed to get/create folder: {str(e)}")
-            return None
+            error_msg = f"Failed to upload file: {str(e)}"
+            logging.error(error_msg)
+            return False, error_msg
 
 def sync_from_drive():
     """Sync files from Google Drive"""

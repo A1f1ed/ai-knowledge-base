@@ -188,26 +188,34 @@ def get_category_docs_retriever(category: str, selected_files: List[str] = None)
         raise RuntimeError(f"Failed to initialize document retriever: {str(e)}")
 
 def process_uploaded_file(uploaded_file, category: str):
-    """Process uploaded file: upload to Drive and vectorize"""
+    """
+    Process an uploaded file by saving it locally, uploading to Google Drive, and updating the vector database.
+    
+    Args:
+        uploaded_file: The uploaded file
+        category: The category path, can include multiple levels (e.g. 'category/subcategory')
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
     try:
         # 初始化Google Drive服务
         drive_service = GoogleDriveService()
         
+        # 保存到临时文件以进行向量化
+        temp_path = Path(save_uploaded_file(uploaded_file, category))
+        
         # 上传文件到Google Drive
         file_content = uploaded_file.read()
-        if not drive_service.upload_file(file_content, uploaded_file.name, category):
-            raise Exception("Failed to upload file to Google Drive")
-            
-        # 保存到临时文件以进行向量化
-        temp_path = Path("data_base/knowledge_db/ggbond_knowledge") / category / uploaded_file.name
-        temp_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(temp_path, 'wb') as f:
-            f.write(file_content)
+        upload_status, result = drive_service.upload_file(temp_path, category)
+        if not upload_status:
+            st.error(f"Failed to upload file to Google Drive: {result}")
+            return False
             
         # 向量化文件
         if not embed_single_file(temp_path, category):
-            raise Exception("Failed to vectorize file")
+            st.error(f"Failed to vectorize file: {uploaded_file.name}")
+            return False
             
         return True
         

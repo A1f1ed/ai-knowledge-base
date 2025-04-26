@@ -369,11 +369,13 @@ def update_global_vectordb_with_file(file_path: Path) -> bool:
 # ==================================================================
 # embed a single file into the category vector database and the global vector database
 # ==================================================================
-def embed_single_file(file_path: Path) -> bool:
+def embed_single_file(file_path: Path, category: str = None) -> bool:
     """
-    Embed a single file into vector store, maintaining the directory structure
+    Embed a single file into vector store, supporting multi-level directory structure
     Args:
         file_path: Path to the file to embed
+        category: Optional category path (can include multiple levels) relative to KNOWLEDGE_BASE_PATH
+                 If None, it will be derived from file_path's location
     Returns:
         bool: whether the operation is successful
     """
@@ -381,8 +383,22 @@ def embed_single_file(file_path: Path) -> bool:
         from services.google_drive_service import GoogleDriveService
         
         # Get relative path from knowledge base root
-        relative_path = file_path.relative_to(KNOWLEDGE_BASE_PATH)
-        vector_db_path = VECTOR_DB_PATH / relative_path.parent
+        try:
+            relative_path = file_path.relative_to(KNOWLEDGE_BASE_PATH)
+            # Use provided category or derive from file path
+            if category is None:
+                category_path = relative_path.parent
+            else:
+                category_path = Path(category)
+        except ValueError:
+            # If file is not under KNOWLEDGE_BASE_PATH, and no category is provided
+            if category is None:
+                logger.error(f"[VectorDB] File {file_path} is not under knowledge base path and no category provided")
+                return False
+            category_path = Path(category)
+            relative_path = Path(category) / file_path.name
+            
+        vector_db_path = VECTOR_DB_PATH / category_path
         
         # Create text splitter
         text_splitter = get_text_splitter()
@@ -397,6 +413,7 @@ def embed_single_file(file_path: Path) -> bool:
         for doc in docs:
             doc.metadata["source"] = str(file_path)
             doc.metadata["relative_path"] = str(relative_path)
+            doc.metadata["category"] = str(category_path)
             
         # Split documents
         split_docs = text_splitter.split_documents(docs)
@@ -418,12 +435,16 @@ def embed_single_file(file_path: Path) -> bool:
         )
         vectordb.persist()
         
+        # Also update global vector store
+        if not update_global_vectordb_with_file(file_path):
+            logger.warning(f"[VectorDB] Failed to update global vector store for: {file_path}")
+        
         # Sync to Google Drive if needed
         drive_service = GoogleDriveService()
-        if drive_service.sync_vector_store(str(relative_path.parent)):
-            logging.info(f"Vector store synced to Drive for path: {relative_path.parent}")
+        if drive_service.sync_vector_store(str(category_path)):
+            logging.info(f"Vector store synced to Drive for path: {category_path}")
         else:
-            logging.warning(f"Failed to sync vector store to Drive for path: {relative_path.parent}")
+            logging.warning(f"Failed to sync vector store to Drive for path: {category_path}")
         
         return True
         
